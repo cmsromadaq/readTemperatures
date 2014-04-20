@@ -16,6 +16,7 @@
 
 const byte sht75_dataPin =  2;                 // SHTxx serial data
 const byte sht75_sclkPin =  3;                 // SHTxx serial clock
+const byte lm35_analogPin =  0;                // LM35 analog input
 const byte ledPin  = 13;                 // Arduino built-in LED
 const unsigned long TRHSTEP   = 5000UL;  // Sensor query period
 const unsigned long BLINKSTEP =  250UL;  // LED blink period
@@ -29,6 +30,7 @@ float sens1_humidity;
 float sens1_dewpoint;
 
 float sens2_temperature;
+float sample;
 
 byte ledState = 0;
 byte measActive = false;
@@ -39,6 +41,19 @@ unsigned long blinkMillis = 0;
 
 // This version of the code checks return codes for errors
 byte error = 0;
+
+int i;
+
+float readTemperatureLM35(byte nMeasures)
+{
+    sens2_temperature=0;
+    for(i = 0; i<=nMeasures; i++){
+    sample = ( 5.0 * analogRead(lm35_analogPin) * 100.0) / 1024.0;
+    sens2_temperature += sample;
+    delay(50);
+    }
+    sens2_temperature = sens2_temperature/(float)nMeasures; // Calcula-se a mÃ©dia
+}
 
 void setup() {
   byte stat;
@@ -90,6 +105,8 @@ void loop() {
       sens1_humidity = sht.calcHumi(rawData, sens1_temperature); // Convert raw sensor data
       sens1_dewpoint = sht.calcDewpoint(sens1_humidity, sens1_temperature);
       logDataSensor1();
+      readTemperatureLM35(8); //do average of 8 measurements;
+      logDataSensor2();
     }
   }
 }
