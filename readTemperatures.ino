@@ -44,7 +44,7 @@ byte error = 0;
 
 int i;
 
-float readTemperatureLM35(byte nMeasures)
+float readTemperature_LM35(byte nMeasures)
 {
     sens2_temperature=0;
     for(i = 0; i<=nMeasures; i++){
@@ -105,7 +105,7 @@ void loop() {
       sens1_humidity = sht.calcHumi(rawData, sens1_temperature); // Convert raw sensor data
       sens1_dewpoint = sht.calcDewpoint(sens1_humidity, sens1_temperature);
       logDataSensor1();
-      readTemperatureLM35(8); //do average of 8 measurements;
+      readTemperature_LM35(8); //do average of 8 measurements;
       logDataSensor2();
     }
   }
