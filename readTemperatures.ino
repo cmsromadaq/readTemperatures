@@ -16,9 +16,9 @@
 
 const byte sht75_dataPin =  2;                 // SHTxx serial data
 const byte sht75_sclkPin =  3;                 // SHTxx serial clock
-const byte lm35_analogPin =  0;                // LM35 analog input
+const byte lm35_analogPin =  1;                // LM35 analog input
 const byte ledPin  = 13;                 // Arduino built-in LED
-const unsigned long TRHSTEP   = 5000UL;  // Sensor query period
+const unsigned long TRHSTEP   = 10000UL;  // Sensor query period
 const unsigned long BLINKSTEP =  250UL;  // LED blink period
 
 Sensirion sht = Sensirion(sht75_dataPin, sht75_sclkPin);
