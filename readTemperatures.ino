@@ -30,7 +30,6 @@ float sens1_humidity;
 float sens1_dewpoint;
 
 float sens2_temperature;
-float sample;
 
 byte ledState = 0;
 byte measActive = false;
@@ -44,15 +43,19 @@ byte error = 0;
 
 int i;
 
-float readTemperature_LM35(byte nMeasures)
+float readTemperature_LM35()
 {
-    sens2_temperature=0;
-    for(i = 0; i<=nMeasures; i++){
-    sample = ( 5.0 * analogRead(lm35_analogPin) * 100.0) / 1024.0;
-    sens2_temperature += sample;
-    delay(50);
+    int tempread=0;
+    int tmp_t;
+    //Oversampling technique according to http://www.atmel.com/dyn/resources/prod_documents/doc8003.pdf
+    for(i = 0; i<=4; i++){
+      delay(60);
+      if (i==0)
+        continue;
+      tempread += analogRead(lm35_analogPin);
     }
-    sens2_temperature = sens2_temperature/(float)nMeasures; // Calcula-se a mÃ©dia
+    tempread = tempread>>2;
+    sens2_temperature = 110 * (float)tempread / 1024; 
 }
 
 void setup() {
@@ -71,6 +74,9 @@ void setup() {
 //    logError(error);
 //  Serial.print("Status reg = 0x");
 //  Serial.println(stat, HEX);
+
+//Setting analog reference to internal to improve the precision of LM35
+  analogReference(INTERNAL);
 }
 
 void loop() {
@@ -105,7 +111,7 @@ void loop() {
       sens1_humidity = sht.calcHumi(rawData, sens1_temperature); // Convert raw sensor data
       sens1_dewpoint = sht.calcDewpoint(sens1_humidity, sens1_temperature);
       logDataSensor1();
-      readTemperature_LM35(8); //do average of 8 measurements;
+      readTemperature_LM35(); //oversampling
       logDataSensor2();
     }
   }
@@ -114,7 +120,7 @@ void loop() {
 void logDataSensor1() {
   Serial.print("SENS1 T=");   Serial.print(sens1_temperature);
   Serial.print(" H=");  Serial.print(sens1_humidity);
-  Serial.print(" D= ");  Serial.println(sens1_dewpoint);
+  Serial.print(" D=");  Serial.println(sens1_dewpoint);
 }
 
 void logDataSensor2() {
