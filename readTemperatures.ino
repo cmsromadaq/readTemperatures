@@ -48,13 +48,13 @@ float readTemperature_LM35()
     int tempread=0;
     int tmp_t;
     //Oversampling technique according to http://www.atmel.com/dyn/resources/prod_documents/doc8003.pdf
-    for(i = 0; i<=4; i++){
+    for(i = 0; i<=16; i++){
       delay(60);
       if (i==0)
         continue;
       tempread += analogRead(lm35_analogPin);
     }
-    tempread = tempread>>2;
+    tempread = tempread>>4;
     sens2_temperature = 110 * (float)tempread / 1024; 
 }
 
