@@ -14,10 +14,19 @@
 
 #include <Sensirion.h>
 
-const byte sht75_dataPin =  2;                 // SHTxx serial data
-const byte sht75_sclkPin =  3;                 // SHTxx serial clock
+const byte sht75_dataPin =  3;                 // SHTxx serial data
+const byte sht75_sclkPin =  2;                 // SHTxx serial clock
+
 const byte lm35_analogPin =  1;                // LM35 analog input
+const byte lm35_pwmNoise =  10;                //LM35 noise PWM 50% Duty quad wave generator
+const byte lm35_pwmNoise_duty= 127;
+
+const byte lm35_2_analogPin =  2;                // LM35 analog input
+const byte lm35_2_pwmNoise =  11;                //LM35 noise PWM 50% Duty quad wave generator
+const byte lm35_2_pwmNoise_duty= 127;
+
 const byte ledPin  = 13;                 // Arduino built-in LED
+
 const unsigned long TRHSTEP   = 10000UL;  // Sensor query period
 const unsigned long BLINKSTEP =  250UL;  // LED blink period
 
@@ -31,6 +40,8 @@ float sens1_dewpoint;
 
 float sens2_temperature;
 
+float sens3_temperature;
+
 byte ledState = 0;
 byte measActive = false;
 byte measType = TEMP;
@@ -43,25 +54,32 @@ byte error = 0;
 
 int i;
 
-float readTemperature_LM35()
+float readTemperature_LM35(int lm35_adc)
 {
     int tempread=0;
     int tmp_t;
+    float temperature;
     //Oversampling technique according to http://www.atmel.com/dyn/resources/prod_documents/doc8003.pdf
     for(i = 0; i<=16; i++){
       delay(60);
       if (i==0)
         continue;
-      tempread += analogRead(lm35_analogPin);
+      tmp_t = analogRead(lm35_adc);
+//      Serial.print("i= "); Serial.print(i);
+//      Serial.print(" adc= "); Serial.println(tmp_t);
+      tempread += tmp_t;
     }
-    tempread = tempread>>4;
-    sens2_temperature = 110 * (float)tempread / 1024; 
+    //tempread = tempread>>4;
+    temperature = 110 * (float)tempread / 1024 / 16; 
+    return temperature;
 }
 
 void setup() {
   byte stat;
   Serial.begin(9600);
   pinMode(ledPin, OUTPUT);
+  pinMode(lm35_pwmNoise, OUTPUT);
+  pinMode(lm35_2_pwmNoise, OUTPUT);
   delay(15);                             // Wait >= 11 ms before first cmd
 // Demonstrate status register read/write
   if (error = sht.readSR(&stat))         // Read sensor status register
@@ -81,6 +99,9 @@ void setup() {
 
 void loop() {
 
+  analogWrite(lm35_pwmNoise,lm35_pwmNoise_duty);
+  analogWrite(lm35_2_pwmNoise,lm35_2_pwmNoise_duty);
+  
   unsigned long curMillis = millis();          // Get current time
 
 //  //Rapidly blink LED.  Blocking calls take too long to allow this.
@@ -111,8 +132,10 @@ void loop() {
       sens1_humidity = sht.calcHumi(rawData, sens1_temperature); // Convert raw sensor data
       sens1_dewpoint = sht.calcDewpoint(sens1_humidity, sens1_temperature);
       logDataSensor1();
-      readTemperature_LM35(); //oversampling
+      sens2_temperature=readTemperature_LM35(lm35_analogPin); //oversampling
       logDataSensor2();
+      sens3_temperature=readTemperature_LM35(lm35_2_analogPin); //oversampling
+      logDataSensor3();
     }
   }
 }
@@ -127,6 +150,9 @@ void logDataSensor2() {
   Serial.print("SENS2 T=");   Serial.println(sens2_temperature);
 }
 
+void logDataSensor3() {
+  Serial.print("SENS3 T=");   Serial.println(sens3_temperature);
+}
 // The following code is only used with error checking enabled
 void logError(byte error) {
   switch (error) {
