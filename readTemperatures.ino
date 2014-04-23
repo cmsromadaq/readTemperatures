@@ -25,6 +25,8 @@ const byte lm35_2_analogPin =  2;                // LM35 analog input
 const byte lm35_2_pwmNoise =  11;                //LM35 noise PWM 50% Duty quad wave generator
 const byte lm35_2_pwmNoise_duty= 127;
 
+const byte lm35_oversampling_averages=32;
+
 const byte ledPin  = 13;                 // Arduino built-in LED
 
 const unsigned long TRHSTEP   = 10000UL;  // Sensor query period
@@ -60,7 +62,7 @@ float readTemperature_LM35(int lm35_adc)
     int tmp_t;
     float temperature;
     //Oversampling technique according to http://www.atmel.com/dyn/resources/prod_documents/doc8003.pdf
-    for(i = 0; i<=16; i++){
+    for(i = 0; i<=lm35_oversampling_averages; i++){
       delay(60);
       if (i==0)
         continue;
@@ -70,7 +72,7 @@ float readTemperature_LM35(int lm35_adc)
       tempread += tmp_t;
     }
     //tempread = tempread>>4;
-    temperature = 110 * (float)tempread / 1024 / 16; 
+    temperature = 110 * (float)tempread / 1024. / (float) lm35_oversampling_averages; 
     return temperature;
 }
 
