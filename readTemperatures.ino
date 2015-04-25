@@ -14,35 +14,27 @@
 
 #include <Sensirion.h>
 
-const byte sht75_dataPin =  3;                 // SHTxx serial data
-const byte sht75_sclkPin =  2;                 // SHTxx serial clock
 
-const byte lm35_analogPin =  1;                // LM35 analog input
-const byte lm35_pwmNoise =  10;                //LM35 noise PWM 50% Duty quad wave generator
-const byte lm35_pwmNoise_duty= 127;
-
-const byte lm35_2_analogPin =  2;                // LM35 analog input
-const byte lm35_2_pwmNoise =  11;                //LM35 noise PWM 50% Duty quad wave generator
-const byte lm35_2_pwmNoise_duty= 127;
-
-const byte lm35_oversampling_averages=32;
 
 const byte ledPin  = 13;                 // Arduino built-in LED
 
 const unsigned long TRHSTEP   = 10000UL;  // Sensor query period
 const unsigned long BLINKSTEP =  250UL;  // LED blink period
 
+const byte sht75_dataPin =  3;                 // SHTxx serial data
+const byte sht75_sclkPin =  2;                 // SHTxx serial clock
 Sensirion sht = Sensirion(sht75_dataPin, sht75_sclkPin);
+unsigned int sht75_rawData;
+float sht75_temperature;
+float sht75_humidity;
+float sht75_dewpoint;
 
-unsigned int rawData;
-
-float sens1_temperature;
-float sens1_humidity;
-float sens1_dewpoint;
-
-float sens2_temperature;
-
-float sens3_temperature;
+#define LM35_SENSORS 2
+float lm35_temperature[LM35_SENSORS];
+const byte lm35_analogPin[LM35_SENSORS] = {1,2}; //anlogPins
+const byte lm35_pwmNoisePin[LM35_SENSORS] = {10,11}; //noisePins
+const byte lm35_pwmNoise_duty= 127; //LM35 noise PWM 50% Duty square generator
+const byte lm35_oversampling_averages=32;
 
 byte ledState = 0;
 byte measActive = false;
@@ -56,7 +48,9 @@ byte error = 0;
 
 int i;
 
-float readTemperature_LM35(int lm35_adc)
+//#define DEBUG
+
+void readTemperature_LM35(byte lm35sensor)
 {
     int tempread=0;
     int tmp_t;
@@ -66,27 +60,35 @@ float readTemperature_LM35(int lm35_adc)
       delay(60);
       if (i==0)
         continue;
-      tmp_t = analogRead(lm35_adc);
-//      Serial.print("i= "); Serial.print(i);
-//      Serial.print(" adc= "); Serial.println(tmp_t);
+      tmp_t = analogRead(lm35_analogPin[lm35sensor]);
+#ifdef DEBUG
+      Serial.print("sensor "); Serial.print(lm35sensor); Serial.print(" i= "); Serial.print(i);
+      Serial.print(" adc= "); Serial.println(tmp_t);
+#endif
       tempread += tmp_t;
     }
     //tempread = tempread>>4;
     temperature = 110 * (float)tempread / 1024. / (float) lm35_oversampling_averages; 
-    return temperature;
+    lm35_temperature[lm35sensor]=temperature;
+#ifdef DEBUG
+    Serial.print("===> temp LM35 "); Serial.print(lm35sensor); Serial.print("= "); Serial.println(temperature);
+#endif
+    return; 
 }
-
+ 
 void setup() {
   byte stat;
   Serial.begin(9600);
   pinMode(ledPin, OUTPUT);
-  pinMode(lm35_pwmNoise, OUTPUT);
-  pinMode(lm35_2_pwmNoise, OUTPUT);
+  for (byte i=0;i<LM35_SENSORS;++i)
+      pinMode(lm35_pwmNoisePin[i], OUTPUT);
+
   delay(15);                             // Wait >= 11 ms before first cmd
 // Demonstrate status register read/write
   if (error = sht.readSR(&stat))         // Read sensor status register
     logError(error);
-  Serial.print("Status reg = 0x");
+#
+  Serial.print("SHT75 Init Status = 0x");
   Serial.println(stat, HEX);
 //  if (error = sht.writeSR(LOW_RES))      // Set sensor to low resolution
 //    logError(error);
@@ -101,8 +103,8 @@ void setup() {
 
 void loop() {
 
-  analogWrite(lm35_pwmNoise,lm35_pwmNoise_duty);
-  analogWrite(lm35_2_pwmNoise,lm35_2_pwmNoise_duty);
+  for (byte i=0;i<LM35_SENSORS;++i)
+      analogWrite(lm35_pwmNoisePin[i],lm35_pwmNoise_duty);
   
   unsigned long curMillis = millis();          // Get current time
 
@@ -117,7 +119,7 @@ void loop() {
   if (curMillis - trhMillis >= TRHSTEP) {      // Time for new measurements?
     measActive = true;
     measType = TEMP;
-    if (error = sht.meas(TEMP, &rawData, NONBLOCK)) // Start temp measurement
+    if (error = sht.meas(TEMP, &sht75_rawData, NONBLOCK)) // Start temp measurement
       logError(error);
     trhMillis = curMillis;
   }
@@ -126,35 +128,30 @@ void loop() {
       logError(error);
     if (measType == TEMP) {                    // Process temp or humi?
       measType = HUMI;
-      sens1_temperature = sht.calcTemp(rawData);     // Convert raw sensor data
-      if (error = sht.meas(HUMI, &rawData, NONBLOCK)) // Start humi measurement
+      sht75_temperature = sht.calcTemp(sht75_rawData);     // Convert raw sensor data
+      if (error = sht.meas(HUMI, &sht75_rawData, NONBLOCK)) // Start humi measurement
         logError(error);
     } else {
       measActive = false;
-      sens1_humidity = sht.calcHumi(rawData, sens1_temperature); // Convert raw sensor data
-      sens1_dewpoint = sht.calcDewpoint(sens1_humidity, sens1_temperature);
-      logDataSensor1();
-      sens2_temperature=readTemperature_LM35(lm35_analogPin); //oversampling
-      logDataSensor2();
-      sens3_temperature=readTemperature_LM35(lm35_2_analogPin); //oversampling
-      logDataSensor3();
+      sht75_humidity = sht.calcHumi(sht75_rawData, sht75_temperature); // Convert raw sensor data
+      sht75_dewpoint = sht.calcDewpoint(sht75_humidity, sht75_temperature);
+      for (byte i=0;i<LM35_SENSORS;++i)
+	  readTemperature_LM35(i); //oversampling
+      logData();
     }
   }
 }
 
-void logDataSensor1() {
-  Serial.print("SENS1 T=");   Serial.print(sens1_temperature);
-  Serial.print(" H=");  Serial.print(sens1_humidity);
-  Serial.print(" D=");  Serial.println(sens1_dewpoint);
+void logData() {
+  Serial.print("T1=");   Serial.print(sht75_temperature);
+  for (byte i=0;i<LM35_SENSORS;++i)
+    {  
+  Serial.print(" T");Serial.print(i+2); Serial.print("=");   Serial.print(lm35_temperature[i]);
+}
+  Serial.print(" H=");  Serial.print(sht75_humidity);
+  Serial.print(" D=");  Serial.println(sht75_dewpoint);
 }
 
-void logDataSensor2() {
-  Serial.print("SENS2 T=");   Serial.println(sens2_temperature);
-}
-
-void logDataSensor3() {
-  Serial.print("SENS3 T=");   Serial.println(sens3_temperature);
-}
 // The following code is only used with error checking enabled
 void logError(byte error) {
   switch (error) {
